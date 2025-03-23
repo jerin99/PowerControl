@@ -1,14 +1,18 @@
-# consumer.py
+# power_control/consumers.py
 from channels.generic.websocket import AsyncWebsocketConsumer
 import json
+
+# Shared state (for simplicity; use cache in production)
+shared_state = {
+    'units': None,
+    'total_power': 0.0
+}
 
 class PowerConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.group_name = "power_group"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
-        self.units = None  # Units limit, None if not set
-        self.total_power = 0  # Accumulated power
         print(f"Client connected, channel: {self.channel_name}")
 
     async def disconnect(self, close_code):
@@ -23,7 +27,7 @@ class PowerConsumer(AsyncWebsocketConsumer):
             if data['command'] in ['on', 'off']:
                 print("Sending command:", data['command'])
                 if data['command'] == 'on':
-                    self.total_power = 0  # Reset total when turning ON
+                    shared_state['total_power'] = 0  # Reset total when turning ON
                 await self.channel_layer.group_send(
                     self.group_name,
                     {
@@ -32,29 +36,35 @@ class PowerConsumer(AsyncWebsocketConsumer):
                     }
                 )
         elif 'units' in data:
-            self.units = float(data['units'])
-            self.total_power = 0  # Reset total when setting units
-            print(f"Units set to {self.units}, broadcasting ON")
+            shared_state['units'] = float(data['units'])
+            shared_state['total_power'] = 0  # Reset total when setting units
+            print(f"Units set to {shared_state['units']}, Total reset to {shared_state['total_power']}")
             await self.channel_layer.group_send(
                 self.group_name,
                 {
                     'type': 'broadcast_message',
-                    'message': {'command': 'on'}
+                    'message': {'command': 'on'}  # Start when units are set
                 }
             )
         elif 'power' in data:
             power = float(data['power'])
-            self.total_power += power
-            print(f"Power: {power}, Total: {self.total_power}")
+            shared_state['total_power'] += power
+            print(f"Power: {power}, Total: {shared_state['total_power']}, Units limit: {shared_state['units']}")
+            # Send update to monitor
             await self.channel_layer.group_send(
                 self.group_name,
                 {
                     'type': 'broadcast_message',
-                    'message': {'power': power, 'total': self.total_power}
+                    'message': {
+                        'power': power,
+                        'total': shared_state['total_power'],
+                        'status': 'Running' if shared_state['units'] is None or shared_state['total_power'] < shared_state['units'] else 'Stopped'
+                    }
                 }
             )
-            if self.units is not None and self.total_power >= self.units:
-                print("Limit reached, broadcasting OFF")
+            # Check if total power exceeds or equals the set units
+            if shared_state['units'] is not None and shared_state['total_power'] >= shared_state['units']:
+                print(f"Limit {shared_state['units']} reached or exceeded (Total: {shared_state['total_power']}), sending OFF")
                 await self.channel_layer.group_send(
                     self.group_name,
                     {
