@@ -7,8 +7,8 @@ class PowerConsumer(AsyncWebsocketConsumer):
         self.group_name = "power_group"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
-        self.units = None
-        self.total_power = 0
+        self.units = None  # Units limit, None if not set
+        self.total_power = 0  # Accumulated power
         print(f"Client connected, channel: {self.channel_name}")
 
     async def disconnect(self, close_code):
@@ -22,6 +22,8 @@ class PowerConsumer(AsyncWebsocketConsumer):
         if 'command' in data:
             if data['command'] in ['on', 'off']:
                 print("Sending command:", data['command'])
+                if data['command'] == 'on':
+                    self.total_power = 0  # Reset total when turning ON
                 await self.channel_layer.group_send(
                     self.group_name,
                     {
@@ -31,7 +33,7 @@ class PowerConsumer(AsyncWebsocketConsumer):
                 )
         elif 'units' in data:
             self.units = float(data['units'])
-            self.total_power = 0
+            self.total_power = 0  # Reset total when setting units
             print(f"Units set to {self.units}, broadcasting ON")
             await self.channel_layer.group_send(
                 self.group_name,
@@ -51,7 +53,7 @@ class PowerConsumer(AsyncWebsocketConsumer):
                     'message': {'power': power, 'total': self.total_power}
                 }
             )
-            if self.units and self.total_power >= self.units:
+            if self.units is not None and self.total_power >= self.units:
                 print("Limit reached, broadcasting OFF")
                 await self.channel_layer.group_send(
                     self.group_name,
