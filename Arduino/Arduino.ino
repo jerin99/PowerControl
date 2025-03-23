@@ -1,32 +1,24 @@
-const int relayPin = 7; // Relay control pin (adjust as needed)
+const int relayPin = 7;
 
 void setup() {
-  Serial.begin(115200); // Match ESP8266 baud rate
+  Serial.begin(115200);
   pinMode(relayPin, OUTPUT);
-  digitalWrite(relayPin, LOW); // Relay OFF by default
+  digitalWrite(relayPin, LOW);
   Serial.println("Arduino Ready");
 }
 
 void loop() {
-  // Handle commands from ESP8266
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
-    command.trim(); // Remove any whitespace/newlines
-    if (command == "ON") {
+    Serial.print("Received: ");
+    Serial.println(command);
+    command.trim();
+    if (command == "on") {
       digitalWrite(relayPin, HIGH);
       Serial.println("Relay ON");
-    } else if (command == "OFF") {
+    } else if (command == "off") {
       digitalWrite(relayPin, LOW);
       Serial.println("Relay OFF");
     }
-  }
-
-  // Send power data every second when relay is ON
-  static unsigned long lastTime = 0;
-  if (digitalRead(relayPin) == HIGH && millis() - lastTime >= 1000) {
-    // Simulate power reading (replace with actual sensor if needed)
-    float power = random(0, 10) / 10.0; // 0.0 to 0.9W for demo
-    Serial.println(power, 2); // Send with 2 decimal places
-    lastTime = millis();
   }
 }

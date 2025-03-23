@@ -3,7 +3,7 @@
 
 const char* ssid = "Zyva";
 const char* password = "$Iamkali@99$";
-const char* websocket_server = "192.168.0.102"; // Replace with your PC’s IP
+const char* websocket_server = "192.168.0.102"; // Set to your PC’s IP from Django logs
 
 WebSocketsClient webSocket;
 
@@ -16,6 +16,10 @@ void setup() {
     Serial.print(".");
   }
   Serial.println("Connected to WiFi");
+  Serial.print("ESP8266 IP: ");
+  Serial.println(WiFi.localIP()); // Show ESP8266’s IP
+  Serial.print("Connecting to WebSocket server: ");
+  Serial.println(websocket_server);
 
   webSocket.begin(websocket_server, 8000, "/ws/power/");
   webSocket.onEvent(webSocketEvent);
@@ -25,26 +29,14 @@ void setup() {
 void loop() {
   webSocket.loop();
 
-  // Periodic heartbeat to check connection
   static unsigned long lastHeartbeat = 0;
   if (millis() - lastHeartbeat >= 5000) {
     Serial.println("Heartbeat: WebSocket " + String(webSocket.isConnected() ? "Connected" : "Disconnected"));
-    lastHeartbeat = millis();
-  }
-
-  // Send power data every second
-  static unsigned long lastTime = 0;
-  if (millis() - lastTime >= 1000) {
-    if (Serial.available()) {
-      float power = Serial.parseFloat();
-      if (power > 0) {
-        String json = "{\"power\":" + String(power) + "}";
-        webSocket.sendTXT(json);
-        Serial.println("Sent power: " + String(power));
-      }
-      while (Serial.available()) Serial.read(); // Clear buffer
+    if (!webSocket.isConnected()) {
+      Serial.println("Attempting to reconnect to " + String(websocket_server) + ":8000/ws/power/");
+      webSocket.begin(websocket_server, 8000, "/ws/power/");
     }
-    lastTime = millis();
+    lastHeartbeat = millis();
   }
 }
 
@@ -61,12 +53,10 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       Serial.println("Received: " + message);
       if (message.indexOf("\"command\":\"on\"") >= 0) {
         Serial.println("ON");
+        Serial.println("Sent ON to Arduino");
       } else if (message.indexOf("\"command\":\"off\"") >= 0) {
         Serial.println("OFF");
-      } else if (message.indexOf("\"units\"") >= 0) {
-        Serial.println("Units received: " + message);
-      } else if (message.indexOf("\"power\"") >= 0) {
-        Serial.println("Power update: " + message);
+        Serial.println("Sent OFF to Arduino");
       }
       break;
     }
