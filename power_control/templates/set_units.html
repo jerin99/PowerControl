@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Set Units</title>
+</head>
+<body>
+    <input type="number" id="units" placeholder="Enter units" step="0.1">
+    <button onclick="sendUnits()">Send</button>
+
+    <script>
+        let socket;
+        function connectWebSocket() {
+            socket = new WebSocket('ws://192.168.0.102:8000/ws/power/'); // Replace with your PC’s IP
+            
+            socket.onopen = function() {
+                console.log('WebSocket connected');
+            };
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+            socket.onclose = function() {
+                console.log('WebSocket closed, retrying in 2s...');
+                setTimeout(connectWebSocket, 2000);
+            };
+            socket.onmessage = function(event) {
+                console.log('Received:', event.data);
+            };
+        }
+
+        function sendUnits() {
+            const units = document.getElementById('units').value;
+            if (socket && socket.readyState === WebSocket.OPEN && units) {
+                const message = JSON.stringify({'units': units});
+                socket.send(message);
+                console.log('Sent:', message);
+            } else {
+                console.log('WebSocket not connected or invalid input');
+            }
+        }
+
+        // Initial connection
+        connectWebSocket();
+    </script>
+</body>
+</html>

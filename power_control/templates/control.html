@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Control</title>
+</head>
+<body>
+    <button onclick="sendCommand('on')">ON</button>
+    <button onclick="sendCommand('off')">OFF</button>
+
+    <script>
+        let socket;
+        function connectWebSocket() {
+            socket = new WebSocket('ws://192.168.0.102:8000/ws/power/'); // Replace with your PC’s IP
+            
+            socket.onopen = function() {
+                console.log('WebSocket connected');
+            };
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+            socket.onclose = function() {
+                console.log('WebSocket closed, retrying in 2s...');
+                setTimeout(connectWebSocket, 2000); // Retry after 2 seconds
+            };
+            socket.onmessage = function(event) {
+                console.log('Received:', event.data);
+            };
+        }
+
+        function sendCommand(cmd) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                const message = JSON.stringify({'command': cmd});
+                socket.send(message);
+                console.log('Sent:', message);
+            } else {
+                console.log('WebSocket not connected, cannot send:', cmd);
+            }
+        }
+
+        // Initial connection
+        connectWebSocket();
+    </script>
+</body>
+</html>
